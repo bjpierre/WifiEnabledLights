@@ -2,6 +2,8 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266mDNS.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include "FastLED.h"
 
 #ifndef STASSID
@@ -59,6 +61,7 @@ void setup(void) {
   
   startWifi();
   startLed();
+  startOTA();
 
   loopFunction = Solid;
   
@@ -146,13 +149,13 @@ void setup(void) {
 }
 
 void loop(void) {
+  ArduinoOTA.handle();
   server.handleClient();
   MDNS.update();
   handleEnum();
 }
 
 void startWifi(){
-   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -166,6 +169,41 @@ void startWifi(){
   if (MDNS.begin("ZAQ147")) {
     Serial.println("MDNS responder started");
   }
+}
+
+void startOTA(){
+   ArduinoOTA.onStart([]() {
+    String type;
+    if (ArduinoOTA.getCommand() == U_FLASH) {
+      type = "sketch";
+    } else { // U_FS
+      type = "filesystem";
+    }
+
+    // NOTE: if updating FS this would be the place to unmount FS using FS.end()
+    Serial.println("Start updating " + type);
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nEnd");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) {
+      Serial.println("Auth Failed");
+    } else if (error == OTA_BEGIN_ERROR) {
+      Serial.println("Begin Failed");
+    } else if (error == OTA_CONNECT_ERROR) {
+      Serial.println("Connect Failed");
+    } else if (error == OTA_RECEIVE_ERROR) {
+      Serial.println("Receive Failed");
+    } else if (error == OTA_END_ERROR) {
+      Serial.println("End Failed");
+    }
+  });
+  ArduinoOTA.begin();
 }
 
 void startLed(){
@@ -317,18 +355,24 @@ void WaveFunction(){
 }
 
 void ChaseFunction(){
-  for(int j = 0; j<10; j++){
-    for(int q = 0; q <3; q++){
-      for(int i = 0; i<NUM_LEDS; i +=3){
-        leds[i+q] = CRGB(r,g,b);
-      }
-      FastLED.show();
-      delay(70);
-
-      for(int i =0; i <NUM_LEDS; i+=3){
-        leds[i+q] = CRGB(0,0,0);
-      }
+  if(!initialSet)
+  {
+     if(server.args()>0){
+      storedVariableA = server.arg(0).toInt();
+    }else{
+      storedVariableA = 700;
     }
+    initialSet = true;
+  }
+   for(int q = 0; q <3; q++){
+     for(int i = 0; i<NUM_LEDS; i +=3){
+       leds[i+q] = CRGB(r,g,b);
+     }
+     FastLED.show();
+     delay(storedVariableA);
+     for(int i =0; i <NUM_LEDS; i+=3){
+       leds[i+q] = CRGB(0,0,0);
+     }
   }
 }
 
@@ -400,5 +444,5 @@ void SparkleFunction(){
 }
 
 void DemoFunction(){
-  
+  //test
 }
